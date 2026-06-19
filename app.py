@@ -22,31 +22,22 @@ h1 { color: #111827; }
 st.title("🤖 Smart Dashboard Assistant")
 
 # =========================
-# ✅ IMPROVED NORMALIZATION
+# ✅ NORMALIZATION
 # =========================
 
 def normalize_text(text):
     text = text.lower()
 
-    # ✅ Handle dot cases
+    # ✅ Handle dot
+    text = text.replace("dotn", ".")
     text = text.replace("dot", ".")
-    text = text.replace("dotn", ".")  # handles optumdotncom
 
-    # ✅ Convert LOB patterns BEFORE removing symbols
-    
-    # M&R → MNR
+    # ✅ Convert LOB patterns
     text = text.replace("m&r", "mnr")
-    text = text.replace("m & r", "mnr")
-
-    # C&S → CNS
     text = text.replace("c&s", "cns")
-    text = text.replace("c & s", "cns")
-
-    # E&I → ENI
     text = text.replace("e&i", "eni")
-    text = text.replace("e & i", "eni")
 
-    # ✅ Now remove special characters
+    # ✅ Remove special chars
     text = re.sub(r"[^a-z0-9.]", "", text)
 
     return text
@@ -94,26 +85,7 @@ for msg in st.session_state.messages:
     with st.chat_message(msg["role"]):
         st.markdown(msg["content"], unsafe_allow_html=True)
 
-user_input = st.chat_input("Ask for dashboards or use filters...")
-
-# =========================
-# ✅ FILTER ONLY VIEW
-# =========================
-
-if selected_lob != "All" and not user_input:
-    filtered_df = df[df["LOB_clean"] == selected_lob_clean]
-
-    st.subheader(f"📊 Dashboards for {selected_lob}")
-
-    for _, row in filtered_df.iterrows():
-        st.markdown(f"""
-<div style="background:#fff;padding:12px;border-radius:12px;margin-bottom:10px;
-box-shadow:0 2px 8px rgba(0,0,0,0.08); border-left:5px solid #4F8BF9;">
-<b>📊 {row['Dashboard Name']}</b><br>
-<small>LOB: {row['LOB']}</small><br>
-{row['Link']}
-</div>
-""", unsafe_allow_html=True)
+user_input = st.chat_input("Ask like: 'MNR executive dashboard'")
 
 # =========================
 # ✅ CHATBOT
@@ -134,31 +106,51 @@ if user_input:
         bot_response = """👋 Hello!
 
 Try:
-• CNS
-• C&S
-• optumdotcom
+• CNS dashboards  
+• MNR executive dashboards  
+• Show me ENI reports  
 """
 
     # ✅ HELP
     elif "help" in user_lower:
         bot_response = """
-📖 Works with variations:
+📖 **How to use:**
 
-• C&S = CNS  
-• M&R = MNR  
-• E&I = ENI  
-• optumdotcom = optum.com  
+✅ Type LOB → shows all dashboards  
+✅ Type LOB + keyword → filtered results  
+✅ Use normal sentences  
+
+Examples:
+• "CNS"  
+• "MNR executive dashboard"  
+• "show me CNS reports"  
 """
 
-    # ✅ PURE LOB MATCH
-    elif user_clean in LOB_LIST:
+    else:
 
-        filtered_df = df[df["LOB_clean"] == user_clean]
+        # ✅ ✅ DETECT LOB FROM QUERY
+        detected_lob = None
+        for lob in LOB_LIST:
+            if lob in user_clean:
+                detected_lob = lob
+                break
 
-        bot_response = f"📊 **All dashboards for {user_clean.upper()}**<br><br>"
+        # ✅ ✅ APPLY FILTER PRIORITY
+        if detected_lob:
+            filtered_df = df[df["LOB_clean"] == detected_lob].copy()
 
-        for _, row in filtered_df.iterrows():
-            bot_response += f"""
+        elif selected_lob != "All":
+            filtered_df = df[df["LOB_clean"] == selected_lob_clean].copy()
+
+        else:
+            filtered_df = df.copy()
+
+        # ✅ ✅ PURE LOB CASE
+        if detected_lob and len(user_clean) <= len(detected_lob) + 2:
+            bot_response = f"📊 **All dashboards for {detected_lob.upper()}**<br><br>"
+
+            for _, row in filtered_df.iterrows():
+                bot_response += f"""
 <div style="background:#fff;padding:12px;border-radius:12px;margin-bottom:10px;
 box-shadow:0 2px 8px rgba(0,0,0,0.08); border-left:5px solid #4F8BF9;">
 <b>📊 {row['Dashboard Name']}</b><br>
@@ -166,32 +158,28 @@ box-shadow:0 2px 8px rgba(0,0,0,0.08); border-left:5px solid #4F8BF9;">
 {row['Link']}
 </div>
 """
-
-    # ✅ SMART SEARCH
-    else:
-
-        if selected_lob != "All":
-            filtered_df = df[df["LOB_clean"] == selected_lob_clean].copy()
         else:
-            filtered_df = df.copy()
+            # ✅ ✅ SMART SEARCH INSIDE FILTER
+            user_vec = vectorizer.transform([user_input])
+            similarity = cosine_similarity(user_vec, X).flatten()
 
-        user_vec = vectorizer.transform([user_input])
-        similarity = cosine_similarity(user_vec, X).flatten()
+            filtered_df["similarity"] = similarity[filtered_df.index]
 
-        filtered_df["similarity"] = similarity[filtered_df.index]
+            fuzzy_scores = filtered_df["combined"].apply(
+                lambda x: fuzz.token_set_ratio(user_input, x) / 100
+            )
 
-        fuzzy_scores = filtered_df["combined"].apply(
-            lambda x: fuzz.token_set_ratio(user_input, x) / 100
-        )
+            filtered_df["score"] = filtered_df["similarity"] * 0.6 + fuzzy_scores * 0.4
 
-        filtered_df["score"] = filtered_df["similarity"] * 0.6 + fuzzy_scores * 0.4
+            results = filtered_df.sort_values(by="score", ascending=False).head(3)
 
-        results = filtered_df.sort_values(by="score", ascending=False).head(3)
+            if detected_lob:
+                bot_response = f"📊 **Top {detected_lob.upper()} dashboards:**<br><br>"
+            else:
+                bot_response = "✅ **Top Dashboard Matches:**<br><br>"
 
-        bot_response = "✅ **Top matches:**<br><br>"
-
-        for _, row in results.iterrows():
-            bot_response += f"""
+            for _, row in results.iterrows():
+                bot_response += f"""
 <div style="background:#fff;padding:12px;border-radius:12px;margin-bottom:10px;
 box-shadow:0 2px 8px rgba(0,0,0,0.08); border-left:5px solid #4F8BF9;">
 <b>📊 {row['Dashboard Name']}</b><br>
