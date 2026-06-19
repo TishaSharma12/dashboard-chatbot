@@ -28,16 +28,16 @@ st.title("🤖 Smart Dashboard Assistant")
 def normalize_text(text):
     text = text.lower()
 
-    # ✅ Handle dot
+    # dot handling
     text = text.replace("dotn", ".")
     text = text.replace("dot", ".")
 
-    # ✅ Convert LOB patterns
+    # LOB conversions
     text = text.replace("m&r", "mnr")
     text = text.replace("c&s", "cns")
     text = text.replace("e&i", "eni")
 
-    # ✅ Remove special chars
+    # remove special chars
     text = re.sub(r"[^a-z0-9.]", "", text)
 
     return text
@@ -55,11 +55,10 @@ df["combined"] = (
     df["Dashboard Name"] + " " + df["LOB"] + " " + df["LOB_clean"] + " dashboard report"
 )
 
-# ✅ Vectorization
+# ✅ Vectorizer
 vectorizer = TfidfVectorizer(stop_words="english")
 X = vectorizer.fit_transform(df["combined"])
 
-# ✅ LOB list
 LOB_LIST = df["LOB_clean"].unique().tolist()
 
 # =========================
@@ -101,10 +100,9 @@ if user_input:
     user_lower = user_input.lower()
     user_clean = normalize_text(user_input)
 
-    # ✅ GREETING
+    # ✅ GREETING (IMPROVED)
     if any(word in user_lower for word in ["hi", "hello", "hey"]):
-        bot_response = 
-bot_response = """
+        bot_response = """
 👋 **Hello! Welcome to your Dashboard Assistant**
 
 I can help you quickly find the right dashboards.
@@ -115,48 +113,59 @@ I can help you quickly find the right dashboards.
 • 📑 *"Show me ENI reports"*  
 
 ### 💡 Tip:
-Just type naturally — I understand queries like:  
+Just type naturally — like:  
 *"show me MNR executive dashboard"*
 
 Or use filters on the left 👉
 """
 
-    # ✅ HELP
+    # ✅ HELP (IMPROVED)
     elif "help" in user_lower:
         bot_response = """
-📖 **How to use:**
+📖 **Here’s how you can use me:**
 
-✅ Type LOB → shows all dashboards  
-✅ Type LOB + keyword → filtered results  
-✅ Use normal sentences  
+🔍 **Search by dashboard name:**
+• MNR Dashboard  
+• Revenue Report  
 
-Examples:
-• "CNS"  
-• "MNR executive dashboard"  
-• "show me CNS reports"  
+📊 **Search by LOB (supports variations):**
+• CNS → also works for C&S  
+• MNR → also works for M&R  
+• ENI → also works for E&I  
+
+🔗 **Ask for dashboards naturally:**
+• "Give me MNR dashboard link"  
+• "CNS executive dashboards"  
+
+🎯 **Smart behavior:**
+• Only LOB → shows ALL dashboards  
+• LOB + keywords → filtered + ranked results  
+
+💡 **Examples:**
+• "CNS executive dashboard"  
+• "optumdotcom report"
 """
 
     else:
 
-        # ✅ ✅ DETECT LOB FROM QUERY
+        # ✅ Detect LOB inside query
         detected_lob = None
         for lob in LOB_LIST:
             if lob in user_clean:
                 detected_lob = lob
                 break
 
-        # ✅ ✅ APPLY FILTER PRIORITY
+        # ✅ Apply filtering logic
         if detected_lob:
             filtered_df = df[df["LOB_clean"] == detected_lob].copy()
-
         elif selected_lob != "All":
             filtered_df = df[df["LOB_clean"] == selected_lob_clean].copy()
-
         else:
             filtered_df = df.copy()
 
-        # ✅ ✅ PURE LOB CASE
+        # ✅ PURE LOB CASE
         if detected_lob and len(user_clean) <= len(detected_lob) + 2:
+
             bot_response = f"📊 **All dashboards for {detected_lob.upper()}**<br><br>"
 
             for _, row in filtered_df.iterrows():
@@ -168,8 +177,9 @@ box-shadow:0 2px 8px rgba(0,0,0,0.08); border-left:5px solid #4F8BF9;">
 {row['Link']}
 </div>
 """
+
         else:
-            # ✅ ✅ SMART SEARCH INSIDE FILTER
+            # ✅ SMART SEARCH
             user_vec = vectorizer.transform([user_input])
             similarity = cosine_similarity(user_vec, X).flatten()
 
