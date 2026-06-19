@@ -103,12 +103,22 @@ if user_input:
 
     # ✅ GREETING
     if any(word in user_lower for word in ["hi", "hello", "hey"]):
-        bot_response = """👋 Hello!
+        bot_response = 
+bot_response = """
+👋 **Hello! Welcome to your Dashboard Assistant**
 
-Try:
-• CNS dashboards  
-• MNR executive dashboards  
-• Show me ENI reports  
+I can help you quickly find the right dashboards.
+
+### 🚀 Try asking:
+• 📊 *"CNS dashboards"*  
+• 📈 *"MNR executive dashboards"*  
+• 📑 *"Show me ENI reports"*  
+
+### 💡 Tip:
+Just type naturally — I understand queries like:  
+*"show me MNR executive dashboard"*
+
+Or use filters on the left 👉
 """
 
     # ✅ HELP
